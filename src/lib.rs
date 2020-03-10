@@ -1,57 +1,15 @@
 use std::mem::{zeroed, transmute};
 use std::ptr::{null_mut};
 use std::sync::atomic::{AtomicPtr, Ordering};
-use std::ffi::CStr;
 use std::cmp::max;
 use winapi::shared::{minwindef::{HINSTANCE, LPARAM, DWORD}, windef::HWND};
-use winapi::ctypes::{c_void, c_char, c_int, c_uint};
+use winapi::ctypes::{c_void, c_int, c_uint};
 use winapi::um::winuser::{WM_USER, SendMessageW, SetTimer};
 use winapi::um::consoleapi::AllocConsole;
 // use widestring::U16CString;
 
-#[repr(C)]
-pub struct CorsairChannelsInfo {
-    channels_count: c_int,
-    channels: *const c_void,
-}
-
-#[repr(C)]
-pub struct CorsairProtocolDetails {
-    sdk_version: *const c_char,
-    server_version: *const c_char,
-    sdk_protocol_version: c_int,
-    server_protocl_version: c_int,
-    breaking_changes: bool,
-    channels: CorsairChannelsInfo,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct CorsairDeviceInfo {
-    device_type: c_int,
-    model: *const c_char,
-    physical_layout: c_int,
-    logical_layout: c_int,
-    caps_mask: c_int,
-    leds_count: c_int,
-}
-
-#[repr(C)]
-pub struct CorsairLedColor {
-    led_id: c_int,
-    red: c_int,
-    green: c_int,
-    blue: c_int,
-}
-
-#[link(name = "CUESDK_2017")]
-extern "C" {
-    fn CorsairPerformProtocolHandshake() -> CorsairProtocolDetails;
-    fn CorsairGetDeviceCount() -> c_int;
-    fn CorsairGetDeviceInfo(device_index: c_int) -> *const CorsairDeviceInfo;
-    fn CorsairSetLedsColorsBufferByDeviceIndex(device_index: c_int, size: c_int, leds_colors: *const CorsairLedColor);
-    fn CorsairSetLedsColorsFlushBuffer() -> bool;
-}
+mod corsair;
+use corsair::Color;
 
 #[repr(C)]
 pub struct WinampGeneralPurposePlugin {
@@ -84,22 +42,10 @@ extern fn init() -> c_int {
     let parent = get_plugin().parent;
     unsafe { AllocConsole() };
 
-    let corsair = unsafe { CorsairPerformProtocolHandshake() };
-    println!("SDK {}, Server {}", corsair.sdk_protocol_version, corsair.server_protocl_version);
+    if !corsair::handshake() { return 0x1; }
 
-    if corsair.server_protocl_version == 0 {
-        return 0x1;
-    }
-
-    let device_count = unsafe { CorsairGetDeviceCount() };
-    println!("{} devices", device_count);
-
-    for idx in 0 .. device_count {
-        let device = unsafe { &*CorsairGetDeviceInfo(idx) };
-        let name = unsafe { CStr::from_ptr(device.model).to_str().unwrap() };
-
-        println!("{}: {:?}", name, device);
-    }
+    let devices = corsair::devices();
+    println!("{:?}", devices);
 
     let result = unsafe { transmute::<isize, *mut c_void>(SendMessageW(parent, WM_WA_IPC, 0, IPC_GETVUDATAFUNC)) };
     VUDATAFUNC.store(result, Ordering::Relaxed);
@@ -123,17 +69,20 @@ extern "system" fn on_timer(_: HWND, _: c_uint, _: usize, _: DWORD) {
         return;
     }
 
-    let color = CorsairLedColor {
-        led_id: 762,
-        red: max(0, value) / 2,
-        green: max(0, value) / 2,
-        blue: max(0, value)
-    };
+    // corsair::set_led(1, 762, Color::new(value as u8, value as u8, value as u8));
+    corsair::set_leds(0, &[
+        (200, Color::new(value as u8, value as u8, value as u8)),
+    ]);
 
-    unsafe {
-        CorsairSetLedsColorsBufferByDeviceIndex(0, 1, &color as *const CorsairLedColor);
-        CorsairSetLedsColorsFlushBuffer();
-    }
+    corsair::set_leds(1, &[
+        (762, Color::new(value as u8, value as u8, value as u8)),
+        (763, Color::new(value as u8, value as u8, value as u8)),
+        (764, Color::new(value as u8, value as u8, value as u8)),
+        (765, Color::new(value as u8, value as u8, value as u8)),
+        (766, Color::new(255, 0, 0)),
+    ]);
+
+    corsair::flush();
 }
 
 #[no_mangle]
