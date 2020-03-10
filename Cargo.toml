@@ -1,0 +1,13 @@
+[package]
+name = "gen_leds"
+version = "0.1.0"
+authors = ["Thibault Hamel <contact@adaedra.eu>"]
+edition = "2018"
+
+[lib]
+name = "gen_leds"
+crate-type = ["cdylib"]
+
+[dependencies]
+winapi = { version = "0.3", features = ["windef", "winuser", "consoleapi"] }
+widestring = "0.4"
