@@ -52,9 +52,10 @@ extern fn config() {}
 extern fn quit() {}
 
 extern "system" fn on_timer(_: HWND, _: c_uint, _: usize, _: DWORD) {
-    let vu = vu_get(0);
+    let vu1 = vu_get(0);
+    let vu2 = vu_get(1);
 
-    println!("{}", vu);
+    println!("Channel 0: {:5} Channel 1: {:5}", vu1, vu2);
 }
 
 #[no_mangle]
