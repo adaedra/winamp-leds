@@ -44,6 +44,7 @@ pub struct Device {
     leds_count: usize,
 }
 
+#[derive(Debug)]
 pub struct Color(u8, u8, u8);
 
 impl Color {
