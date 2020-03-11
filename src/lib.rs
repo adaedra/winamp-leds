@@ -77,7 +77,7 @@ extern "system" fn on_timer(_: HWND, _: c_uint, _: usize, _: DWORD) {
         front_leds.push((200 + idx, Color::new(255, 255, 255)));
     }
     for idx in 0 .. left_width + right_width {
-        front_leds.push((200 + 15 - left_width + idx, Color::new(255, 0, 0)));
+        front_leds.push((200 + 15 - left_width + idx, Color::new(0, 0, 255)));
     }
     for idx in 0 .. 15 - right_width {
         front_leds.push((230 - idx - 1, Color::new(255, 255, 255)));
@@ -87,14 +87,14 @@ extern "system" fn on_timer(_: HWND, _: c_uint, _: usize, _: DWORD) {
     if front_leds.len() != 30 {
         println!("ERR: {} items ({}, {})", front_leds.len(), left_width, right_width);
     } else {
-        corsair::set_leds(0, &front_leds[..]);
+        corsair::set_leds(1, &front_leds[..]);
     }
 
     let mut cpu_leds = Vec::with_capacity(12);
     for idx in 0 .. 12 {
         cpu_leds.push((766 + idx, Color::new(value as u8, value as u8, value as u8)));
     }
-    corsair::set_leds(1, &cpu_leds[..]);
+    corsair::set_leds(0, &cpu_leds[..]);
 
     corsair::flush();
 }
