@@ -1,3 +1,5 @@
+use palette::rgb::Rgb;
+
 use winapi::shared::{
     ntdef::{CHAR, VOID},
     minwindef::{BOOL, INT}
@@ -44,13 +46,6 @@ pub struct Device {
     leds_count: usize,
 }
 
-#[derive(Debug)]
-pub struct Color(u8, u8, u8);
-
-impl Color {
-    pub fn new(r: u8, g: u8, b: u8) -> Color { Color(r, g, b) }
-}
-
 #[link(name = "CUESDK_2017")]
 extern "C" {
     fn CorsairPerformProtocolHandshake() -> CorsairProtocolDetails;
@@ -87,17 +82,17 @@ pub fn devices() -> Vec<Device> {
 }
 
 // TODO: Check for errors
-pub fn set_leds(device: i32, leds: &[(i32, Color)]) {
+pub fn set_leds(device: i32, leds: &[(i32, Rgb)]) {
     let mut data = Vec::with_capacity(leds.len());
 
     for led in leds {
-        let (id, Color(r, g, b)) = *led;
+        let (id, Rgb { red, green, blue, .. }) = *led;
 
         data.push(CorsairLedColor {
             led_id: id as INT,
-            red: r as INT,
-            green: g as INT,
-            blue: b as INT,
+            red: (red * 255.0) as INT,
+            green: (green * 255.0) as INT,
+            blue: (blue * 255.0) as INT,
         });
     }
 

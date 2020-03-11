@@ -11,3 +11,4 @@ crate-type = ["cdylib"]
 [dependencies]
 winapi = { version = "0.3", features = ["windef", "winuser", "consoleapi"] }
 widestring = "0.4"
+palette = "0.5.0"

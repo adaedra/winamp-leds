@@ -1,15 +1,14 @@
 use std::mem::{zeroed, transmute};
 use std::ptr::{null_mut};
-use std::sync::atomic::{AtomicPtr, Ordering};
-use std::cmp::max;
+use std::sync::atomic::{AtomicPtr, AtomicU16, Ordering};
 use winapi::shared::{minwindef::{HINSTANCE, LPARAM, DWORD}, windef::HWND};
 use winapi::ctypes::{c_void, c_int, c_uint};
 use winapi::um::winuser::{WM_USER, SendMessageW, SetTimer};
 use winapi::um::consoleapi::AllocConsole;
+use palette::{Hsv, rgb::Rgb};
 // use widestring::U16CString;
 
 mod corsair;
-use corsair::Color;
 
 #[repr(C)]
 pub struct WinampGeneralPurposePlugin {
@@ -24,6 +23,7 @@ pub struct WinampGeneralPurposePlugin {
 
 static PLUGIN: AtomicPtr<WinampGeneralPurposePlugin> = AtomicPtr::new(null_mut());
 static VUDATAFUNC: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
+static CURRENT_HUE: AtomicU16 = AtomicU16::new(0);
 
 fn get_plugin<'a>() -> &'a WinampGeneralPurposePlugin {
     unsafe { &*PLUGIN.load(Ordering::Relaxed) }
@@ -61,26 +61,39 @@ extern fn config() {}
 extern fn quit() {}
 
 extern "system" fn on_timer(_: HWND, _: c_uint, _: usize, _: DWORD) {
-    let vu_left = vu_get(0);
-    let vu_right = vu_get(1);
-    let value = max(vu_left, vu_right);
+    let (left, right) = {
+        let vu_left = vu_get(0);
+        let vu_right = vu_get(1);
 
-    if value == -1 {
-        return;
-    }
+        if vu_left == -1 || vu_right == - 1 { return; }
+        (vu_left as f32 / 255.0, vu_right as f32 / 255.0)
+    };
 
-    let left_width = vu_left * 15 / 255;
-    let right_width = vu_right * 15 / 255;
+    let left_width = (left * 15.0) as usize;
+    let right_width = (right * 15.0) as usize;
 
-    let mut front_leds = Vec::with_capacity(30);
+    let mut front_leds = Vec::<(i32, Rgb)>::with_capacity(30);
+    let hue = {
+        let current = CURRENT_HUE.fetch_add(1, Ordering::Relaxed);
+
+        if current > 360 {
+            CURRENT_HUE.store(current % 360, Ordering::Relaxed);
+            (current % 360) as f32
+        } else {
+            current as f32
+        }
+    };
+
+    let color: Rgb = Hsv::new(hue, 1.0, 1.0).into();
+
     for idx in 0 .. 15 - left_width {
-        front_leds.push((200 + idx, Color::new(255, 255, 255)));
+        front_leds.push(((200 + idx) as i32, Rgb::new(1.0, 1.0, 1.0)));
     }
     for idx in 0 .. left_width + right_width {
-        front_leds.push((200 + 15 - left_width + idx, Color::new(0, 0, 255)));
+        front_leds.push(((200 + 15 - left_width + idx) as i32, color));
     }
     for idx in 0 .. 15 - right_width {
-        front_leds.push((230 - idx - 1, Color::new(255, 255, 255)));
+        front_leds.push(((230 - idx - 1) as i32, Rgb::new(1.0, 1.0, 1.0)));
     }
 
     // println!("{:?}", front_leds);
@@ -90,9 +103,12 @@ extern "system" fn on_timer(_: HWND, _: c_uint, _: usize, _: DWORD) {
         corsair::set_leds(1, &front_leds[..]);
     }
 
-    let mut cpu_leds = Vec::with_capacity(12);
+    let mut cpu_leds = Vec::<(i32, Rgb)>::with_capacity(12);
+    let value = left.max(right);
+    let color: Rgb = Hsv::new(hue, 1.0, value).into();
+
     for idx in 0 .. 12 {
-        cpu_leds.push((766 + idx, Color::new(value as u8, value as u8, value as u8)));
+        cpu_leds.push((766 + idx, color));
     }
     corsair::set_leds(0, &cpu_leds[..]);
 
